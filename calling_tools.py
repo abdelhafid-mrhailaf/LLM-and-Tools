@@ -10,7 +10,9 @@ import gradio as gr
 import requests
 import http.client
 import json
+from rich.console import Console
 
+console = Console(record=True)
 
 
 
@@ -124,21 +126,22 @@ pushover_url = "https://api.pushover.net/1/messages.json"
 serper_token = os.getenv("SERPER_API_KEY")
 
 def push(message):
-    print(f"Push: {message}")
+    console.print(f"[green]Push: {message}[/green]")
     payload = {"user": pushover_user, "token": pushover_token, "message": message}
     requests.post(pushover_url, data=payload)
 
 
 def push_information(intent_phrase="intent_phrase not provided", context="not provided", payload=""):
-    print("__________________________________________________________________________")
-    print(f"push_information called: intent_phrase {intent_phrase}, context: {context}, payload: {payload}")
+    console.print("[dim]__________________________________________________________________________[/dim]")
+    console.print(f"[green]push_information called: intent_phrase={intent_phrase}, context={context}, payload={payload}[/green]")
+
     push_info = "context: " + context + "\n" + payload
     push(push_info)
     return {"recorded": "ok"}
 
 def web_search(query: str, context="not provided"):
-    print("__________________________________________________________________________")
-    print(f"web_search called: query {query}, context: {context}")
+    console.print("[dim]__________________________________________________________________________[/dim]")
+    console.print(f"[green]web_search called: query {query}, context: {context}[/green]")
     conn = http.client.HTTPSConnection("google.serper.dev")
     payload = json.dumps({
     "q": f"{query}"
@@ -157,23 +160,23 @@ def web_search(query: str, context="not provided"):
 def handle_tool_calls(tool_calls):
     results = []
     for tool_call in tool_calls:
-        print("_____________________________________________________________________")
-        print(f"hande_tool_calls called: {tool_calls}")
+        console.print("[dim]__________________________________________________________________________[/dim]")
+        console.print(f"[cyan]hande_tool_calls called: {tool_calls}[/cyan]")
         tool_name = tool_call.function.name
         arguments = json.loads(tool_call.function.arguments)
-        print(f"Tool called: {tool_name}", flush=True)
+        console.print(f"[cyan]Tool called: {tool_name}[/cyan]")
 
         # THE BIG IF STATEMENT!!!
 
         if tool_name == "push_information":
-            print("_____________________________________________________________________")
-            print("handle tool calls push_information arguments")
-            print(f"arguments: {arguments}")
+            console.print("[dim]__________________________________________________________________________[/dim]")
+            console.print("[cyan]handle tool calls push_information arguments[/cyan]")
+            console.print(f"[cyan]arguments: {arguments}[/cyan]")
             result = push_information(**arguments)
         elif tool_name == "web_search":
-            print("_____________________________________________________________________")
-            print("handle tool calls web_search arguments")
-            print(f"arguments: {arguments}")
+            console.print("[dim]__________________________________________________________________________[/dim]")
+            console.print("[cyan]handle tool calls web_search arguments[/cyan]")
+            console.print(f"[cyan]arguments: {arguments}[/cyan]")
             result = web_search(**arguments)
 
         results.append({"role": "tool","content": json.dumps(result),"tool_call_id": tool_call.id})
@@ -188,10 +191,10 @@ def chat(message, history):
     while not done:
         response = openai.chat.completions.create(model="gpt-4o-mini", messages=messages, tools=tools)
         finish_reason = response.choices[0].finish_reason
-        print("____________________________________________________________________________________________")
-        print(f"Chat Response: {response.choices[0]}")
-        print(f"Chat finish_reason {finish_reason}")
-        print("____________________________________________________________________________________________")
+        console.print("[dim]__________________________________________________________________________[/dim]")
+        console.print(f"[green]Chat Response: {response.choices[0]}[/green]")
+        console.print(f"[green]Chat finish_reason {finish_reason}[/green]")
+        console.print("[dim]__________________________________________________________________________[/dim]")
         if finish_reason=="tool_calls":
             #print(f"message: tool call {message}")
             message = response.choices[0].message
@@ -201,8 +204,12 @@ def chat(message, history):
             messages.extend(results)
         else:
             done = True
+            console.print("[dim]__________________________________________________________________________[/dim]")
+            console.print(f"[red]result displayed[/red]")
     return response.choices[0].message.content
 
 
 
+
 gr.ChatInterface(chat, type="messages").launch()
+console.save_text("logs/run-gpt-4o.md")
