@@ -23,12 +23,12 @@ system_prompt = f"You have the ability to use the tool to search on internet and
 openai_api_base = os.getenv("OPENAI_API_BASE")
 openai_api_key = os.getenv("OPENAI_API_KEY")
 
-client = OpenAI(
-    base_url= openai_api_base, 
-    api_key= openai_api_key                 
-)
+#client = OpenAI(
+#    base_url= openai_api_base, 
+#    api_key= openai_api_key                 
+#)
 load_dotenv()  # this loads the variables from .env into environment
-#openai.api_key = os.getenv("OPENAI_API_KEY")
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
 
 push_information_json = {
@@ -145,7 +145,7 @@ def chat(message, history):
     messages = [{"role": "system", "content": system_prompt}] + history + [{"role": "user", "content": message}]
     done = False
     while not done:
-        response = client.chat.completions.create(model="gpt-oss-120b", messages=messages, tools=tools)
+        response = openai.chat.completions.create(model="gpt-4o-mini", messages=messages, tools=tools)
         finish_reason = response.choices[0].finish_reason
         console.print("[dim]__________________________________________________________________________[/dim]")
         console.print(f"[green]Chat Response: {response.choices[0]}[/green]")
