@@ -18,47 +18,7 @@ console = Console(record=True)
 
 load_dotenv(override=True)
 
-system_prompt = """
-You are a fact-conscious language model designed to prioritize epistemic accuracy over fluency or persuasion.
-
-Your core principle is: “If it is not verifiable, do not claim it.”
-
-Behavior rules:
-
-1. When answering, clearly distinguish:
-
-• Verified factual information  
-• Probabilistic inference  
-• Personal or cultural opinion  
-• Unknown / unverifiable areas
-
-2. Use cautious qualifiers when needed:
-
-• “According to…”, “As of [date]…”, “It appears that…”  
-• When unsure, say: “I dont know” or “This cannot be confirmed.”
-
-3. Avoid hallucinations:
-
-• Do not fabricate data, names, dates, events, studies, or quotes  
-• Do not simulate sources or cite imaginary articles
-
-4. When asked for evidence, only refer to known and trustworthy sources:
-
-• Prefer primary sources, peer-reviewed studies, or official data
-
-5. If the question contains speculative or false premises:
-
-• Gently correct or flag the assumption  
-• Do not expand upon unverifiable or fictional content as fact
-
-Your tone is calm, informative, and precise. You are not designed to entertain or persuade, but to clarify and verify.
-
-If browsing or retrieval tools are enabled, you may use them to confirm facts. If not, maintain epistemic humility and avoid confident speculation.
-
-When you decide to push, call the `push_information` tool with
-`payload` equal to the exact final answer you would otherwise reply with.
-
-"""
+system_prompt = f"You have the ability to use the tool to search on internet and send the result to the user"
 
 openai_api_base = os.getenv("OPENAI_API_BASE")
 openai_api_key = os.getenv("OPENAI_API_KEY")
@@ -74,19 +34,16 @@ load_dotenv()  # this loads the variables from .env into environment
 push_information_json = {
     "name": "push_information",
     "description": (
-        "Use this tool when the user's message includes expressions such as "
-        "'push it', 'run it', 'use it', 'activate it', 'start it', or similar phrases "
-        "that clearly indicate the intention to execute or trigger a push information tool. "
-        "This tool signals that an action should be initiated based on the user's command."
+        "Use this tool to record the result of a question asked by the user"
     ),
     "parameters": {
         "type": "object",
         "properties": {
             "intent_phrase": {"type": "string", "description": "Trigger phrase"},
-            "context": {"type": "string", "description": "Why this is pushed"},
+            "context": {"type": "string", "description": "Why this is recorded"},
             "payload": {
                 "type": "string",
-                "description": "THE EXACT final assistant answer to push"
+                "description": "The final assistant answer to record"
             }
         },
         "required": ["intent_phrase", "payload"],
@@ -98,9 +55,7 @@ web_search_json = {
     "name": "web_search",
     "description": (
         "Use this tool when the user's message clearly asks for real or recent information "
-        "that must be looked up online  for example, when they say things like "
-        "'search the web', 'look it up', 'find out', 'check online', 'what’s happening with', "
-        "or otherwise imply they want current or factual data. "
+        "that must be looked up online"
         "This tool should be called whenever the answer requires external, up-to-date information."
     ),
     "parameters": {
@@ -154,6 +109,7 @@ def web_search(query: str, context="not provided"):
     res = conn.getresponse()
     data = res.read()
     string_data = data.decode("utf-8")
+    console.print(f"[red]")
     return string_data
 
 
@@ -206,6 +162,9 @@ def chat(message, history):
             done = True
             console.print("[dim]__________________________________________________________________________[/dim]")
             console.print(f"[red]result displayed[/red]")
+    content = response.choices[0].message.content
+    if content is None:
+        content = "(Keine Textantwort vom Modell)"
     return response.choices[0].message.content
 
 
