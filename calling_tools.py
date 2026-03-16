@@ -15,41 +15,20 @@ from rich.console import Console
 console = Console(record=True)
 
 
+system_prompt = (
+    "You have exactly ONE tool available: web_search. "
+    "Do NOT invent or call any other tools. "
+    "After ONE web search, always summarize the results and answer the user directly. "
+    "Never call web_search more than once per user question."
+)
 
-load_dotenv(override=True)
+openai_api_base = "http://ip:8000/v1"
+openai_api_key = "no_key"
 
-system_prompt = f"You have the ability to use the tool to search on internet and send the result to the user"
-
-openai_api_base = os.getenv("OPENAI_API_BASE")
-openai_api_key = os.getenv("OPENAI_API_KEY")
-
-#client = OpenAI(
-#    base_url= openai_api_base, 
-#    api_key= openai_api_key                 
-#)
-load_dotenv()  # this loads the variables from .env into environment
-openai.api_key = os.getenv("OPENAI_API_KEY")
-
-
-push_information_json = {
-    "name": "push_information",
-    "description": (
-        "Use this tool to record the result of a question asked by the user"
-    ),
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "intent_phrase": {"type": "string", "description": "Trigger phrase"},
-            "context": {"type": "string", "description": "Why this is recorded"},
-            "payload": {
-                "type": "string",
-                "description": "The final assistant answer to record"
-            }
-        },
-        "required": ["intent_phrase", "payload"],
-        "additionalProperties": False
-    }
-}
+client = OpenAI(
+   base_url= openai_api_base, 
+   api_key= openai_api_key                 
+)
 
 web_search_json = {
     "name": "web_search",
@@ -75,24 +54,8 @@ web_search_json = {
     }
 }
 
-pushover_user = os.getenv("PUSHOVER_USER")
-pushover_token = os.getenv("PUSHOVER_TOKEN")
-pushover_url = "https://api.pushover.net/1/messages.json"
-serper_token = os.getenv("SERPER_API_KEY")
+serper_token = "token" #you can get a free one on the official website
 
-def push(message):
-    console.print(f"[green]Push: {message}[/green]")
-    payload = {"user": pushover_user, "token": pushover_token, "message": message}
-    requests.post(pushover_url, data=payload)
-
-
-def push_information(intent_phrase="intent_phrase not provided", context="not provided", payload=""):
-    console.print("[dim]__________________________________________________________________________[/dim]")
-    console.print(f"[green]push_information called: intent_phrase={intent_phrase}, context={context}, payload={payload}[/green]")
-
-    push_info = "context: " + context + "\n" + payload
-    push(push_info)
-    return {"recorded": "ok"}
 
 def web_search(query: str, context="not provided"):
     console.print("[dim]__________________________________________________________________________[/dim]")
@@ -116,36 +79,33 @@ def web_search(query: str, context="not provided"):
 def handle_tool_calls(tool_calls):
     results = []
     for tool_call in tool_calls:
-        console.print("[dim]__________________________________________________________________________[/dim]")
-        console.print(f"[cyan]hande_tool_calls called: {tool_calls}[/cyan]")
         tool_name = tool_call.function.name
         arguments = json.loads(tool_call.function.arguments)
-        console.print(f"[cyan]Tool called: {tool_name}[/cyan]")
+        console.print(f"[cyan]Tool called: {tool_name}, args: {arguments}[/cyan]")
 
-        # THE BIG IF STATEMENT!!!
+        if tool_name == "web_search":
+            query = arguments.get("query", "")
+            context = arguments.get("context", "not provided")
+            result = web_search(query=query, context=context)
+        else:
+            # Unbekanntes Tool abfangen
+            console.print(f"[red]Unbekanntes Tool: {tool_name} — wird ignoriert[/red]")
+            result = f"Tool '{tool_name}' existiert nicht. Nur 'web_search' ist verfügbar."
 
-        if tool_name == "push_information":
-            console.print("[dim]__________________________________________________________________________[/dim]")
-            console.print("[cyan]handle tool calls push_information arguments[/cyan]")
-            console.print(f"[cyan]arguments: {arguments}[/cyan]")
-            result = push_information(**arguments)
-        elif tool_name == "web_search":
-            console.print("[dim]__________________________________________________________________________[/dim]")
-            console.print("[cyan]handle tool calls web_search arguments[/cyan]")
-            console.print(f"[cyan]arguments: {arguments}[/cyan]")
-            result = web_search(**arguments)
-
-        results.append({"role": "tool","content": json.dumps(result),"tool_call_id": tool_call.id})
+        results.append({
+            "role": "tool",
+            "content": json.dumps(result),
+            "tool_call_id": tool_call.id
+        })
     return results
 
-tools = [{"type": "function", "function": push_information_json},
-         {"type": "function", "function": web_search_json}]
+tools = [{"type": "function", "function": web_search_json}]
 
 def chat(message, history):
     messages = [{"role": "system", "content": system_prompt}] + history + [{"role": "user", "content": message}]
     done = False
     while not done:
-        response = openai.chat.completions.create(model="gpt-4o-mini", messages=messages, tools=tools)
+        response = client.chat.completions.create(model="gpt-oss-120b", messages=messages, tools=tools)
         finish_reason = response.choices[0].finish_reason
         console.print("[dim]__________________________________________________________________________[/dim]")
         console.print(f"[green]Chat Response: {response.choices[0]}[/green]")
@@ -170,5 +130,4 @@ def chat(message, history):
 
 
 
-gr.ChatInterface(chat, type="messages").launch()
-console.save_text("logs/run-gpt-oss-120b.md")
+gr.ChatInterface(chat).launch()
